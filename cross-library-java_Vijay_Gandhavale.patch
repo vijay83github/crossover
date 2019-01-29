@@ -1,7 +1,7 @@
 From 2380ba7e7479530859ae8310f213a87dc3eb7823 Mon Sep 17 00:00:00 2001
 From: Vijay Gandhavale <vgandhavale@mediaocean.com>
 Date: Wed, 30 Jan 2019 01:30:17 +0530
-Subject: [PATCH] My submission
+Subject: [PATCH 1/2] My submission
 XOV: XO_0_0_1
 
 ---
@@ -1313,6 +1313,79 @@ index 0000000..9c89dc2
 +        assertNull(result);
 +    }
 +}
+-- 
+2.11.0.windows.1
+
+
+From dc74c7f326e525253ccfd2be180a424be942b189 Mon Sep 17 00:00:00 2001
+From: Vijay Gandhavale <vgandhavale@mediaocean.com>
+Date: Wed, 30 Jan 2019 02:07:45 +0530
+Subject: [PATCH 2/2] second commit
+XOV: XO_0_0_1
+
+---
+ .../controller/TransactionControllerTest.java      | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java b/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
+index bb88335..8639c8c 100644
+--- a/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
++++ b/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
+@@ -19,15 +19,20 @@ import org.springframework.test.web.servlet.MockMvc;
+ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+ import org.springframework.web.client.RestTemplate;
+ 
++import java.util.ArrayList;
+ import java.util.HashMap;
++import java.util.List;
+ import java.util.Map;
+ 
++import com.crossover.techtrial.dto.MemberBooks;
+ import com.crossover.techtrial.model.Book;
+ import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.model.Transaction;
+ import com.crossover.techtrial.repositories.BookRepository;
+ import com.crossover.techtrial.repositories.MemberRepository;
+ import com.crossover.techtrial.repositories.TransactionRepository;
++import com.fasterxml.jackson.databind.ObjectMapper;
++
+ @RunWith(SpringJUnit4ClassRunner.class)
+ @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+ public class TransactionControllerTest extends ControllerBaseTest{
+@@ -74,6 +79,33 @@ public class TransactionControllerTest extends ControllerBaseTest{
+         memberRepository.deleteById(member.getBody().getId());
+     }
+ 
++    @Test
++    public void testIssueBooksToMember() throws Exception{
++        ResponseEntity<Book> book = createBook(template);
++        ResponseEntity<Member> member = doMemberRegistration(template);
++        MemberBooks memberBooks = new MemberBooks();
++        memberBooks.setMemberId(member.getBody().getId());
++        List<Long> books = new ArrayList<>();
++        books.add(book.getBody().getId());
++        book = createBook(template);
++        books.add(book.getBody().getId());
++         memberBooks.setBooks(books);
++        ObjectMapper objectMapper = new ObjectMapper();
++        ;
++
++        HttpEntity<Object> body = getHttpEntity(objectMapper.writeValueAsString(memberBooks));
++
++        ResponseEntity<String> status = template.postForEntity(
++                "/api/transaction/bulk", body, String.class);
++
++        Assert.assertEquals(200,status.getStatusCode().value());
++
++        //clear a transaction
++        transactionRepository.deleteAll();
++        bookRepository.deleteAll();
++        memberRepository.deleteAll();
++    }
++
+     private ResponseEntity<Transaction> createNewTransaction(ResponseEntity<Book> book, ResponseEntity<Member> member) {
+ 
+         HttpEntity<Object> body = getHttpEntity("{ \"bookId\":"+book.getBody().getId()+",\"memberId\":"+member.getBody().getId()+" }");
 -- 
 2.11.0.windows.1
 
