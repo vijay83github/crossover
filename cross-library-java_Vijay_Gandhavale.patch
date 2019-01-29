@@ -1,0 +1,1318 @@
+From 2380ba7e7479530859ae8310f213a87dc3eb7823 Mon Sep 17 00:00:00 2001
+From: Vijay Gandhavale <vgandhavale@mediaocean.com>
+Date: Wed, 30 Jan 2019 01:30:17 +0530
+Subject: [PATCH] My submission
+XOV: XO_0_0_1
+
+---
+ .gitignore                                         |   2 +
+ build.gradle                                       |  16 ++++
+ gradlew                                            |   0
+ .../techtrial/controller/BookController.java       |   2 +-
+ .../techtrial/controller/MemberController.java     |  23 ++---
+ .../controller/TransactionController.java          |  49 ++++++++--
+ .../com/crossover/techtrial/dto/MemberBooks.java   |  37 ++++++++
+ .../java/com/crossover/techtrial/model/Member.java |  30 ++++--
+ .../repositories/TransactionRepository.java        |  10 +-
+ .../crossover/techtrial/service/BookService.java   |   3 +-
+ .../techtrial/service/BookServiceImpl.java         |  20 ++--
+ .../crossover/techtrial/service/MemberService.java |   7 +-
+ .../techtrial/service/MemberServiceImpl.java       |  31 +++++-
+ .../techtrial/service/TransactionService.java      |  14 +++
+ .../techtrial/service/TransactionServiceImpl.java  |  58 ++++++++++++
+ .../resources/db/changelog/db.changelog-1.0.xml    |   4 +-
+ .../techtrial/controller/BookControllerTest.java   |  88 +++++++++++++++++
+ .../techtrial/controller/ControllerBaseTest.java   |  36 +++++++
+ .../techtrial/controller/MemberControllerTest.java |  92 ++++++++++++++----
+ .../controller/TransactionControllerTest.java      | 105 +++++++++++++++++++++
+ .../techtrial/service/BaseServiceTest.java         |  55 +++++++++++
+ .../techtrial/service/BookServiceImplTest.java     |  76 +++++++++++++++
+ .../techtrial/service/MemberServiceImplTest.java   |  89 +++++++++++++++++
+ .../service/TransactionServiceImplTest.java        |  80 ++++++++++++++++
+ 24 files changed, 862 insertions(+), 65 deletions(-)
+ mode change 100755 => 100644 gradlew
+ create mode 100644 src/main/java/com/crossover/techtrial/dto/MemberBooks.java
+ create mode 100644 src/main/java/com/crossover/techtrial/service/TransactionService.java
+ create mode 100644 src/main/java/com/crossover/techtrial/service/TransactionServiceImpl.java
+ create mode 100644 src/test/java/com/crossover/techtrial/controller/BookControllerTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/controller/ControllerBaseTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/service/BaseServiceTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/service/BookServiceImplTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/service/MemberServiceImplTest.java
+ create mode 100644 src/test/java/com/crossover/techtrial/service/TransactionServiceImplTest.java
+
+diff --git a/.gitignore b/.gitignore
+index 38e8d91..4febd90 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,6 +2,8 @@
+ bin/*
+ /.classpath
+ /.project
++/.class
++.idea
+ .gradle/*
+ build/*
+ target/*
+diff --git a/build.gradle b/build.gradle
+index 2d73af5..9d9935b 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -22,6 +22,8 @@ apply plugin: 'org.springframework.boot'
+ apply plugin: 'io.spring.dependency-management'
+ apply plugin: 'com.github.ksoichiro.console.reporter'
+ 
++
++
+ group = 'com.crossover'
+ version = '0.0.1-SNAPSHOT'
+ sourceCompatibility = 1.8
+@@ -39,9 +41,23 @@ dependencies {
+ 	runtime('org.springframework.boot:spring-boot-devtools')
+ 	runtime('mysql:mysql-connector-java')
+ 	testCompile('com.h2database:h2')
++	testCompile('org.apache.httpcomponents:httpclient:4.5.3')
+ 	testCompile('org.springframework.boot:spring-boot-starter-aop')
+ 	testCompile('org.springframework.boot:spring-boot-starter-test')
+ 	testCompile('org.mockito:mockito-core:2.7.22')
+ 	
+ }
+ 
++jacoco {
++	toolVersion = "0.8.1"
++	reportsDir = file("$buildDir/reports/jacoco")
++}
++
++jacocoTestReport {
++	reports {
++		xml.enabled false
++		csv.enabled false
++		html.destination file("${buildDir}/jacocoHtml")
++	}
++}
++
+diff --git a/gradlew b/gradlew
+old mode 100755
+new mode 100644
+diff --git a/src/main/java/com/crossover/techtrial/controller/BookController.java b/src/main/java/com/crossover/techtrial/controller/BookController.java
+index a171514..ad450f7 100644
+--- a/src/main/java/com/crossover/techtrial/controller/BookController.java
++++ b/src/main/java/com/crossover/techtrial/controller/BookController.java
+@@ -45,7 +45,7 @@ public class BookController {
+    * PLEASE DO NOT CHANGE API SIGNATURE OR METHOD TYPE OF END POINTS
+    */
+   @GetMapping(path = "/api/book/{book-id}")
+-  public ResponseEntity<Book> getRideById(@PathVariable(name="book-id",required=true)Long bookId){
++  public ResponseEntity<Book> getBookById(@PathVariable(name="book-id",required=true)Long bookId){
+     Book book = bookService.findById(bookId);
+     if (book!=null)
+       return ResponseEntity.ok(book);
+diff --git a/src/main/java/com/crossover/techtrial/controller/MemberController.java b/src/main/java/com/crossover/techtrial/controller/MemberController.java
+index 7f613ce..cf82b34 100644
+--- a/src/main/java/com/crossover/techtrial/controller/MemberController.java
++++ b/src/main/java/com/crossover/techtrial/controller/MemberController.java
+@@ -3,18 +3,14 @@
+  */
+ package com.crossover.techtrial.controller;
+ 
+-import java.time.LocalDateTime;
+-import java.util.ArrayList;
+-import java.util.List;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.format.annotation.DateTimeFormat;
+ import org.springframework.http.ResponseEntity;
+-import org.springframework.web.bind.annotation.GetMapping;
+-import org.springframework.web.bind.annotation.PathVariable;
+-import org.springframework.web.bind.annotation.PostMapping;
+-import org.springframework.web.bind.annotation.RequestBody;
+-import org.springframework.web.bind.annotation.RequestParam;
+-import org.springframework.web.bind.annotation.RestController;
++import org.springframework.web.bind.annotation.*;
++
++import java.time.LocalDateTime;
++import java.util.List;
++
+ import com.crossover.techtrial.dto.TopMemberDTO;
+ import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.service.MemberService;
+@@ -70,14 +66,7 @@ public class MemberController {
+   public ResponseEntity<List<TopMemberDTO>> getTopMembers(
+       @RequestParam(value="startTime", required=true) @DateTimeFormat(pattern="yyyy-MM-dd'T'HH:mm:ss") LocalDateTime startTime,
+       @RequestParam(value="endTime", required=true) @DateTimeFormat(pattern="yyyy-MM-dd'T'HH:mm:ss") LocalDateTime endTime){
+-    List<TopMemberDTO> topDrivers = new ArrayList<>();
+-    /**
+-     * Your Implementation Here. 
+-     * 
+-     */
+-    
+-    return ResponseEntity.ok(topDrivers);
++    return ResponseEntity.ok(memberService.findByIssuedDate(startTime, endTime));
+     
+   }
+-  
+ }
+diff --git a/src/main/java/com/crossover/techtrial/controller/TransactionController.java b/src/main/java/com/crossover/techtrial/controller/TransactionController.java
+index 83f41b8..2713e9b 100644
+--- a/src/main/java/com/crossover/techtrial/controller/TransactionController.java
++++ b/src/main/java/com/crossover/techtrial/controller/TransactionController.java
+@@ -4,18 +4,31 @@
+ package com.crossover.techtrial.controller;
+ 
+ import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Map;
++import java.util.Optional;
++import java.util.stream.Collectors;
++
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
++import org.springframework.util.CollectionUtils;
+ import org.springframework.web.bind.annotation.PatchMapping;
+ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RestController;
++
++import com.crossover.techtrial.dto.MemberBooks;
++import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.model.Transaction;
+ import com.crossover.techtrial.repositories.BookRepository;
+ import com.crossover.techtrial.repositories.MemberRepository;
+ import com.crossover.techtrial.repositories.TransactionRepository;
++import com.crossover.techtrial.service.BookService;
++import com.crossover.techtrial.service.MemberService;
++import com.crossover.techtrial.service.TransactionService;
+ 
+ /**
+  * @author kshah
+@@ -24,11 +37,15 @@ import com.crossover.techtrial.repositories.TransactionRepository;
+ @RestController
+ public class TransactionController {
+   
+-  @Autowired TransactionRepository transactionRepository;
++  @Autowired
++  TransactionService transactionService;
+   
+-  @Autowired BookRepository bookRepository;
++  @Autowired
++  BookService bookService;
+   
+-  @Autowired MemberRepository memberRepository;
++  @Autowired
++  MemberService memberService;
++
+   /*
+    * PLEASE DO NOT CHANGE SIGNATURE OR METHOD TYPE OF END POINTS
+    * Example Post Request :  { "bookId":1,"memberId":33 }
+@@ -39,19 +56,37 @@ public class TransactionController {
+     Long bookId = params.get("bookId");
+     Long memberId = params.get("memberId");
+     Transaction transaction = new Transaction();
+-    transaction.setBook(bookRepository.findById(bookId).orElse(null));
+-    transaction.setMember(memberRepository.findById(memberId).get());
++    transaction.setBook(bookService.findById(bookId));
++    transaction.setMember(memberService.findById(memberId));
+     transaction.setDateOfIssue(LocalDateTime.now());    
+-    return ResponseEntity.ok().body(transactionRepository.save(transaction));
++    return ResponseEntity.ok().body(transactionService.save(transaction));
+   }
+   /*
+    * PLEASE DO NOT CHANGE SIGNATURE OR METHOD TYPE OF END POINTS
+    */
+   @PatchMapping(path= "/api/transaction/{transaction-id}/return")
+   public ResponseEntity<Transaction> returnBookTransaction(@PathVariable(name="transaction-id") Long transactionId){
+-    Transaction transaction = transactionRepository.findById(transactionId).get();
++    Transaction transaction = transactionService.findById(transactionId);
+     transaction.setDateOfReturn(LocalDateTime.now());
+     return ResponseEntity.ok().body(transaction);
+   }
+ 
++
++  @PostMapping(path = "/api/transaction/bulk")
++  public ResponseEntity<String> issueBooksToMember(@RequestBody MemberBooks memberBooks){
++    if(CollectionUtils.isEmpty(memberBooks.getBooks()) || memberBooks.getBooks().size() >=5){
++      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
++    }
++
++    Member member = memberService.findById(memberBooks.getMemberId());
++    if(null != member){
++      int totalBooks = member.getMemberTranactions().size() + memberBooks.getBooks().size();
++      if(totalBooks >=5){
++        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
++      }
++      memberBooks.setMember(member);
++      transactionService.saveMemberBooks(memberBooks);
++    }
++    return ResponseEntity.ok().build();
++  }
+ }
+diff --git a/src/main/java/com/crossover/techtrial/dto/MemberBooks.java b/src/main/java/com/crossover/techtrial/dto/MemberBooks.java
+new file mode 100644
+index 0000000..0530c38
+--- /dev/null
++++ b/src/main/java/com/crossover/techtrial/dto/MemberBooks.java
+@@ -0,0 +1,37 @@
++package com.crossover.techtrial.dto;
++
++import java.util.List;
++
++import com.crossover.techtrial.model.Member;
++
++public class MemberBooks {
++    private Long memberId;
++
++    private List<Long> books;
++
++    private Member member;
++
++    public Long getMemberId() {
++        return memberId;
++    }
++
++    public void setMemberId(Long memberId) {
++        this.memberId = memberId;
++    }
++
++    public List<Long> getBooks() {
++        return books;
++    }
++
++    public void setBooks(List<Long> books) {
++        this.books = books;
++    }
++
++    public Member getMember() {
++        return member;
++    }
++
++    public void setMember(Member member) {
++        this.member = member;
++    }
++}
+diff --git a/src/main/java/com/crossover/techtrial/model/Member.java b/src/main/java/com/crossover/techtrial/model/Member.java
+index 99cfb29..58b529d 100644
+--- a/src/main/java/com/crossover/techtrial/model/Member.java
++++ b/src/main/java/com/crossover/techtrial/model/Member.java
+@@ -5,14 +5,13 @@ package com.crossover.techtrial.model;
+ 
+ import java.io.Serializable;
+ import java.time.LocalDateTime;
+-import javax.persistence.Column;
+-import javax.persistence.Entity;
+-import javax.persistence.EnumType;
+-import javax.persistence.Enumerated;
+-import javax.persistence.GeneratedValue;
+-import javax.persistence.GenerationType;
+-import javax.persistence.Id;
+-import javax.persistence.Table;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++import javax.persistence.*;
++
++import com.fasterxml.jackson.annotation.JsonIgnore;
+ 
+ /**
+  * @author kshah
+@@ -40,6 +39,13 @@ public class Member implements Serializable{
+   @Column(name = "membership_start_date")
+   LocalDateTime membershipStartDate;
+ 
++  //@OneToMany(mappedBy = "member", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
++  @JsonIgnore
++  @OneToMany
++  @JoinColumn(name="member_id")
++  Set<Transaction> memberTranactions = new HashSet<>();
++
++
+   public Long getId() {
+     return id;
+   }
+@@ -80,6 +86,14 @@ public class Member implements Serializable{
+     this.membershipStartDate = membershipStartDate;
+   }
+ 
++  public Set<Transaction> getMemberTranactions() {
++    return memberTranactions;
++  }
++
++  public void setMemberTranactions(Set<Transaction> memberTranactions) {
++    this.memberTranactions = memberTranactions;
++  }
++
+   @Override
+   public int hashCode() {
+     final int prime = 31;
+diff --git a/src/main/java/com/crossover/techtrial/repositories/TransactionRepository.java b/src/main/java/com/crossover/techtrial/repositories/TransactionRepository.java
+index cba1dbe..442553a 100644
+--- a/src/main/java/com/crossover/techtrial/repositories/TransactionRepository.java
++++ b/src/main/java/com/crossover/techtrial/repositories/TransactionRepository.java
+@@ -3,15 +3,23 @@
+  */
+ package com.crossover.techtrial.repositories;
+ 
++import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.model.Transaction;
++
++import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.CrudRepository;
++import org.springframework.data.repository.query.Param;
+ import org.springframework.data.rest.core.annotation.RestResource;
+ 
++import java.time.LocalDateTime;
++import java.util.List;
++
+ /**
+  * @author crossover
+  *
+  */
+ @RestResource(exported = false)
+ public interface TransactionRepository extends CrudRepository<Transaction, Long> {
+-
++    @Query("select t.member from Transaction t where t.dateOfIssue =:startTime and t.dateOfReturn =:endTime")
++    List<Member> findAllByDateOfIssueAndDateOfReturn(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+ }
+diff --git a/src/main/java/com/crossover/techtrial/service/BookService.java b/src/main/java/com/crossover/techtrial/service/BookService.java
+index 00dbba7..af91aaa 100644
+--- a/src/main/java/com/crossover/techtrial/service/BookService.java
++++ b/src/main/java/com/crossover/techtrial/service/BookService.java
+@@ -18,5 +18,6 @@ public interface BookService {
+   public Book save(Book p);
+   
+   public Book findById(Long bookId);
+-  
++
++  void deleteById(Long id);
+ }
+diff --git a/src/main/java/com/crossover/techtrial/service/BookServiceImpl.java b/src/main/java/com/crossover/techtrial/service/BookServiceImpl.java
+index a8422db..d39d42d 100644
+--- a/src/main/java/com/crossover/techtrial/service/BookServiceImpl.java
++++ b/src/main/java/com/crossover/techtrial/service/BookServiceImpl.java
+@@ -20,16 +20,13 @@ import com.crossover.techtrial.repositories.TransactionRepository;
+ public class BookServiceImpl implements BookService{
+ 
+   @Autowired
+-  BookRepository bookRepository;
+-  
+-  @Autowired
+-  TransactionRepository transactionRepository;
++  private BookRepository bookRepository;
+   
+   @Override
+   public List<Book> getAll() {
+-    List<Book> personList = new ArrayList<>();
+-    bookRepository.findAll().forEach(personList::add);
+-    return personList;
++    List<Book> books = new ArrayList<>();
++    bookRepository.findAll().forEach(books::add);
++    return books;
+     
+   }
+   
+@@ -39,8 +36,13 @@ public class BookServiceImpl implements BookService{
+ 
+   @Override
+   public Book findById(Long bookId) {
+-    Optional<Book> dbPerson = bookRepository.findById(bookId);
+-    return dbPerson.orElse(null);
++    Optional<Book> bookOption = bookRepository.findById(bookId);
++    return bookOption.orElse(null);
++  }
++
++  @Override
++  public void deleteById(Long id) {
++    bookRepository.deleteById(id);
+   }
+ 
+ }
+diff --git a/src/main/java/com/crossover/techtrial/service/MemberService.java b/src/main/java/com/crossover/techtrial/service/MemberService.java
+index a4fe6ce..51d3cc0 100644
+--- a/src/main/java/com/crossover/techtrial/service/MemberService.java
++++ b/src/main/java/com/crossover/techtrial/service/MemberService.java
+@@ -3,7 +3,11 @@
+  */
+ package com.crossover.techtrial.service;
+ 
++import java.time.LocalDateTime;
++import java.util.ArrayList;
+ import java.util.List;
++
++import com.crossover.techtrial.dto.TopMemberDTO;
+ import com.crossover.techtrial.model.Member;
+ 
+ /**
+@@ -18,5 +22,6 @@ public interface MemberService {
+   public Member findById(Long memberId);
+   
+   public List<Member> findAll();
+-  
++
++  List<TopMemberDTO> findByIssuedDate(LocalDateTime startTime, LocalDateTime endTime);
+ }
+diff --git a/src/main/java/com/crossover/techtrial/service/MemberServiceImpl.java b/src/main/java/com/crossover/techtrial/service/MemberServiceImpl.java
+index 5fbf1a1..ce4cf60 100644
+--- a/src/main/java/com/crossover/techtrial/service/MemberServiceImpl.java
++++ b/src/main/java/com/crossover/techtrial/service/MemberServiceImpl.java
+@@ -3,12 +3,16 @@
+  */
+ package com.crossover.techtrial.service;
+ 
+-import java.util.List;
+-import java.util.Optional;
++import java.time.LocalDateTime;
++import java.util.*;
++
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.stereotype.Service;
++
++import com.crossover.techtrial.dto.TopMemberDTO;
+ import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.repositories.MemberRepository;
++import com.crossover.techtrial.repositories.TransactionRepository;
+ 
+ /**
+  * @author crossover
+@@ -18,7 +22,10 @@ import com.crossover.techtrial.repositories.MemberRepository;
+ public class MemberServiceImpl implements MemberService{
+ 
+   @Autowired
+-  MemberRepository memberRepository;
++  private MemberRepository memberRepository;
++
++  @Autowired
++  private TransactionRepository transactionRepository;
+   
+   public Member save(Member member) {
+     return memberRepository.save(member);
+@@ -35,4 +42,22 @@ public class MemberServiceImpl implements MemberService{
+     return memberRepository.findAll();
+   }
+ 
++  @Override
++  public ArrayList<TopMemberDTO> findByIssuedDate(LocalDateTime startTime, LocalDateTime endTime) {
++    List<Member> members = transactionRepository.findAllByDateOfIssueAndDateOfReturn(startTime,endTime);
++    Map<Long,TopMemberDTO> memberIdToTopMember = new HashMap<>();
++    members.forEach(member -> convertToDTO(member, memberIdToTopMember));
++    return new ArrayList<TopMemberDTO>(memberIdToTopMember.values());
++  }
++
++  private void convertToDTO(Member member, Map<Long,TopMemberDTO> topDrivers) {
++    TopMemberDTO topMemberDTO = topDrivers.get(member.getId());
++    if(null == topMemberDTO){
++      topMemberDTO = new TopMemberDTO(member.getId(), member.getName(),member.getEmail(), 1);
++    }else{
++      topMemberDTO.setBookCount(topMemberDTO.getBookCount()+1);
++    }
++    topDrivers.put(member.getId(), topMemberDTO);
++  }
++
+ }
+diff --git a/src/main/java/com/crossover/techtrial/service/TransactionService.java b/src/main/java/com/crossover/techtrial/service/TransactionService.java
+new file mode 100644
+index 0000000..973bde9
+--- /dev/null
++++ b/src/main/java/com/crossover/techtrial/service/TransactionService.java
+@@ -0,0 +1,14 @@
++package com.crossover.techtrial.service;
++
++import java.util.List;
++
++import com.crossover.techtrial.dto.MemberBooks;
++import com.crossover.techtrial.model.Transaction;
++
++public interface TransactionService {
++    List<Transaction> saveMemberBooks(MemberBooks memberBooks);
++
++    Transaction save(Transaction transaction);
++
++    Transaction findById(Long transactionId);
++}
+diff --git a/src/main/java/com/crossover/techtrial/service/TransactionServiceImpl.java b/src/main/java/com/crossover/techtrial/service/TransactionServiceImpl.java
+new file mode 100644
+index 0000000..61a5c51
+--- /dev/null
++++ b/src/main/java/com/crossover/techtrial/service/TransactionServiceImpl.java
+@@ -0,0 +1,58 @@
++package com.crossover.techtrial.service;
++
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Optional;
++
++import com.crossover.techtrial.dto.MemberBooks;
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.model.Member;
++import com.crossover.techtrial.model.Transaction;
++import com.crossover.techtrial.repositories.BookRepository;
++import com.crossover.techtrial.repositories.TransactionRepository;
++
++@Service
++public class TransactionServiceImpl implements TransactionService {
++
++    @Autowired
++    private TransactionRepository transactionRepository;
++
++    @Autowired
++    private BookRepository bookRepository;
++
++    @Override
++    public List<Transaction> saveMemberBooks(MemberBooks memberBooks) {
++        Iterable<Book> books = bookRepository.findAllById(memberBooks.getBooks());
++        List<Transaction> transactions= new ArrayList<>(memberBooks.getBooks().size());
++        books.forEach(book -> transactions.add(createTransaction(memberBooks.getMember(), book)));
++        Iterable<Transaction> transactionIterable= transactionRepository.saveAll(transactions);
++        List<Transaction> transactionList = new ArrayList<>();
++        transactionIterable.forEach(transaction -> transactionList.add(transaction));
++        return transactionList;
++    }
++
++    @Override
++    public Transaction save(Transaction transaction) {
++        return transactionRepository.save(transaction);
++    }
++
++    @Override
++    public Transaction findById(Long transactionId) {
++        Optional<Transaction> optionalMember = transactionRepository.findById(transactionId);
++        if (optionalMember.isPresent()) {
++            return optionalMember.get();
++        }else return null;
++    }
++
++    private Transaction createTransaction(Member member, Book book) {
++        Transaction transaction = new Transaction();
++        transaction.setBook(book);
++        transaction.setMember(member);
++        transaction.setDateOfIssue(LocalDateTime.now());
++        return transaction;
++    }
++}
+diff --git a/src/main/resources/db/changelog/db.changelog-1.0.xml b/src/main/resources/db/changelog/db.changelog-1.0.xml
+index e4e52fe..3064e8d 100644
+--- a/src/main/resources/db/changelog/db.changelog-1.0.xml
++++ b/src/main/resources/db/changelog/db.changelog-1.0.xml
+@@ -5,7 +5,9 @@
+             <column autoIncrement="true" name="id" type="BIGINT">
+                 <constraints primaryKey="true" primaryKeyName="pk_me"/>
+             </column>
+-            <column name="name" type="VARCHAR(255)"/>
++            <column name="name" type="VARCHAR(255)">
++                <constraints checkConstraint="name LIKE '%[A-Z]+{2,100}%'"/>
++            </column>
+             <column name="email" type="VARCHAR(255)"/>
+             <column name="membership_status" type="VARCHAR(255)"/>
+             <column name="membership_start_date" type="Datetime"/>
+diff --git a/src/test/java/com/crossover/techtrial/controller/BookControllerTest.java b/src/test/java/com/crossover/techtrial/controller/BookControllerTest.java
+new file mode 100644
+index 0000000..d8bc9d8
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/controller/BookControllerTest.java
+@@ -0,0 +1,88 @@
++package com.crossover.techtrial.controller;
++
++import org.junit.Assert;
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.mockito.Mock;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.client.TestRestTemplate;
++import org.springframework.core.ParameterizedTypeReference;
++import org.springframework.http.HttpMethod;
++import org.springframework.http.ResponseEntity;
++import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.service.BookService;
++
++@RunWith(SpringJUnit4ClassRunner.class)
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++public class BookControllerTest extends ControllerBaseTest{
++    private MockMvc mockMvc;
++
++    @Mock
++    private BookController bookController;
++
++    @Autowired
++    private TestRestTemplate template;
++
++    @Autowired
++    private BookService bookService;
++
++    @Before
++    public void setUp() throws Exception {
++        mockMvc = MockMvcBuilders.standaloneSetup(bookController).build();
++    }
++
++    @Test
++    public void testGetBooks() {
++        ResponseEntity<List<Book>> response = template.exchange(
++                "/api/book", HttpMethod.GET,null, new ParameterizedTypeReference<List<Book>>(){});
++        Assert.assertNotNull(response.getBody());
++        Assert.assertEquals(200,response.getStatusCode().value());
++    }
++
++    @Test
++    public void testSaveBook() {
++        ResponseEntity<Book> response = createBook(template);
++
++        Assert.assertEquals("title 1", response.getBody().getTitle());
++        Assert.assertEquals(200,response.getStatusCode().value());
++
++        //cleanup the Book
++        bookService.deleteById(response.getBody().getId());
++    }
++
++    /*private ResponseEntity<Book> createBook() {
++        HttpEntity<Object> book = getHttpEntity(
++                "{\"title\": \"title 1\"}");
++
++        return template.postForEntity(
++                "/api/book", book, Book.class);
++    }*/
++
++    @Test
++    public void testGetBookById() throws Exception {
++        ResponseEntity<Book> response = createBook(template);
++        Long bookId = response.getBody().getId();
++        Map<String, String> paramMap = new HashMap<>();
++        paramMap.put("book-id", String.valueOf(bookId));
++        response = template.getForEntity(
++                "/api/book/{book-id}",Book.class, paramMap);
++        Assert.assertNotNull(response.getBody());
++        Assert.assertEquals(200,response.getStatusCode().value());
++        bookService.deleteById(bookId);
++        paramMap.put("book-id", String.valueOf(bookId));
++        response = template.getForEntity(
++                "/api/book/{book-id}",Book.class, paramMap);
++        Assert.assertNull(response.getBody());
++        Assert.assertEquals(404,response.getStatusCode().value());
++    }
++}
+\ No newline at end of file
+diff --git a/src/test/java/com/crossover/techtrial/controller/ControllerBaseTest.java b/src/test/java/com/crossover/techtrial/controller/ControllerBaseTest.java
+new file mode 100644
+index 0000000..1f3dc0e
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/controller/ControllerBaseTest.java
+@@ -0,0 +1,36 @@
++package com.crossover.techtrial.controller;
++
++import org.springframework.boot.test.web.client.TestRestTemplate;
++import org.springframework.http.HttpEntity;
++import org.springframework.http.HttpHeaders;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.model.Member;
++
++
++public class ControllerBaseTest {
++    HttpEntity<Object> getHttpEntity(Object body) {
++        HttpHeaders headers = new HttpHeaders();
++        headers.setContentType(MediaType.APPLICATION_JSON);
++        return new HttpEntity<>(body, headers);
++    }
++
++    ResponseEntity<Book> createBook(TestRestTemplate template) {
++        HttpEntity<Object> book = getHttpEntity(
++                "{\"title\": \"title 1\"}");
++
++        return template.postForEntity(
++                "/api/book", book, Book.class);
++    }
++
++    ResponseEntity<Member> doMemberRegistration(TestRestTemplate template) {
++        HttpEntity<Object> member = getHttpEntity(
++                "{\"name\": \"test 1\", \"email\": \"test10000000000001@gmail.com\","
++                        + " \"membershipStatus\": \"ACTIVE\",\"membershipStartDate\":\"2018-08-08T12:12:12\" }");
++
++        return template.postForEntity(
++                "/api/member", member, Member.class);
++    }
++}
+diff --git a/src/test/java/com/crossover/techtrial/controller/MemberControllerTest.java b/src/test/java/com/crossover/techtrial/controller/MemberControllerTest.java
+index 0368a7e..ae4d3c2 100644
+--- a/src/test/java/com/crossover/techtrial/controller/MemberControllerTest.java
++++ b/src/test/java/com/crossover/techtrial/controller/MemberControllerTest.java
+@@ -10,15 +10,20 @@ import org.junit.runner.RunWith;
+ import org.mockito.Mock;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.boot.test.context.SpringBootTest;
+-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+ import org.springframework.boot.test.web.client.TestRestTemplate;
++import org.springframework.core.ParameterizedTypeReference;
+ import org.springframework.http.HttpEntity;
+-import org.springframework.http.HttpHeaders;
+-import org.springframework.http.MediaType;
++import org.springframework.http.HttpMethod;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+ import org.springframework.test.web.servlet.MockMvc;
+ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import com.crossover.techtrial.dto.TopMemberDTO;
+ import com.crossover.techtrial.model.Member;
+ import com.crossover.techtrial.repositories.MemberRepository;
+ 
+@@ -27,8 +32,8 @@ import com.crossover.techtrial.repositories.MemberRepository;
+  *
+  */
+ @RunWith(SpringJUnit4ClassRunner.class)
+-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+-public class MemberControllerTest {
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++public class MemberControllerTest extends ControllerBaseTest{
+   
+   MockMvc mockMvc;
+   
+@@ -48,13 +53,8 @@ public class MemberControllerTest {
+   
+   @Test
+   public void testMemberRegsitrationsuccessful() throws Exception {
+-    HttpEntity<Object> member = getHttpEntity(
+-        "{\"name\": \"test 1\", \"email\": \"test10000000000001@gmail.com\"," 
+-            + " \"membershipStatus\": \"ACTIVE\",\"membershipStartDate\":\"2018-08-08T12:12:12\" }");
+-    
+-    ResponseEntity<Member> response = template.postForEntity(
+-        "/api/member", member, Member.class);
+-    
++    ResponseEntity<Member> response = doMemberRegistration(template);
++
+     Assert.assertEquals("test 1", response.getBody().getName());
+     Assert.assertEquals(200,response.getStatusCode().value());
+     
+@@ -62,10 +62,70 @@ public class MemberControllerTest {
+     memberRepository.deleteById(response.getBody().getId());
+   }
+ 
+-  private HttpEntity<Object> getHttpEntity(Object body) {
+-    HttpHeaders headers = new HttpHeaders();
+-    headers.setContentType(MediaType.APPLICATION_JSON);
+-    return new HttpEntity<Object>(body, headers);
++  @Test
++  public void testMemberNameValidation() throws Exception {
++
++      HttpEntity<Object> member = getHttpEntity(
++              "{\"name\": \"1234\", \"email\": \"test10000000000001@gmail.com\","
++                      + " \"membershipStatus\": \"ACTIVE\",\"membershipStartDate\":\"2018-08-08T12:12:12\" }");
++
++    ResponseEntity<Member> response = template.postForEntity(
++              "/api/member", member, Member.class);
++
++    Assert.assertEquals("1234", response.getBody().getName());
++    Assert.assertEquals(200,response.getStatusCode().value());
++
++    //cleanup the user
++    memberRepository.deleteById(response.getBody().getId());
++  }
++
++  /*private ResponseEntity<Member> doMemberRegistration() {
++    HttpEntity<Object> member = getHttpEntity(
++        "{\"name\": \"test 1\", \"email\": \"test10000000000001@gmail.com\","
++            + " \"membershipStatus\": \"ACTIVE\",\"membershipStartDate\":\"2018-08-08T12:12:12\" }");
++
++    return template.postForEntity(
++        "/api/member", member, Member.class);
++  }*/
++
++  @Test
++  public void testGetTopMembers() throws Exception {
++    Map<String, String> paramMap = new HashMap<>();
++
++    paramMap.put("startTime", "2019-01-01T00:00:00");
++    paramMap.put("endTime", "2019-01-31T00:00:00");
++   ResponseEntity<List<TopMemberDTO>> response = template.exchange(
++            "/api/member/top-member?startTime={startTime}&endTime={endTime}", HttpMethod.GET,null, new ParameterizedTypeReference<List<TopMemberDTO>>(){},paramMap);
++    Assert.assertEquals(0, response.getBody().size());
++    Assert.assertEquals(200,response.getStatusCode().value());
+   }
+ 
++
++  @Test
++  public void testGetAll() throws Exception {
++    ResponseEntity<List<Member>> response = template.exchange(
++            "/api/member", HttpMethod.GET,null, new ParameterizedTypeReference<List<Member>>(){});
++    Assert.assertNotNull(response.getBody());
++    Assert.assertEquals(200,response.getStatusCode().value());
++  }
++
++  @Test
++  public void testGetMemberById() throws Exception {
++    ResponseEntity<Member> response = doMemberRegistration(template);
++    Long memberId = response.getBody().getId();
++    Map<String, String> paramMap = new HashMap<>();
++    paramMap.put("member-id", String.valueOf(memberId));
++    response = template.getForEntity(
++            "/api/member/{member-id}",Member.class, paramMap);
++    Assert.assertNotNull(response.getBody());
++    Assert.assertEquals(200,response.getStatusCode().value());
++    memberRepository.deleteById(memberId);
++    paramMap.put("member-id", String.valueOf(memberId));
++    response = template.getForEntity(
++            "/api/member/{member-id}",Member.class, paramMap);
++    Assert.assertNull(response.getBody());
++    Assert.assertEquals(404,response.getStatusCode().value());
++  }
++
++
+ }
+diff --git a/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java b/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
+new file mode 100644
+index 0000000..bb88335
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/controller/TransactionControllerTest.java
+@@ -0,0 +1,105 @@
++package com.crossover.techtrial.controller;
++
++import org.apache.http.client.HttpClient;
++import org.apache.http.impl.client.HttpClientBuilder;
++import org.junit.Assert;
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.mockito.Mock;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.client.TestRestTemplate;
++import org.springframework.http.HttpEntity;
++import org.springframework.http.HttpMethod;
++import org.springframework.http.ResponseEntity;
++import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
++import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++import org.springframework.web.client.RestTemplate;
++
++import java.util.HashMap;
++import java.util.Map;
++
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.model.Member;
++import com.crossover.techtrial.model.Transaction;
++import com.crossover.techtrial.repositories.BookRepository;
++import com.crossover.techtrial.repositories.MemberRepository;
++import com.crossover.techtrial.repositories.TransactionRepository;
++@RunWith(SpringJUnit4ClassRunner.class)
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
++public class TransactionControllerTest extends ControllerBaseTest{
++
++    MockMvc mockMvc;
++
++    @Mock
++    private TransactionController transactionController;
++
++    @Autowired
++    private TestRestTemplate template;
++
++    @Autowired
++    TransactionRepository transactionRepository;
++
++    @Autowired
++    BookRepository bookRepository;
++
++    @Autowired
++    MemberRepository memberRepository;
++
++    private RestTemplate patchRestTemplate;
++    @Before
++    public void setup() throws Exception {
++        mockMvc = MockMvcBuilders.standaloneSetup(transactionController).build();
++        this.patchRestTemplate = template.getRestTemplate();
++        HttpClient httpClient = HttpClientBuilder.create().build();
++        this.patchRestTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
++    }
++
++
++    @Test
++    public void testIssueBookToMember() {
++        ResponseEntity<Book> book = createBook(template);
++        ResponseEntity<Member> member = doMemberRegistration(template);
++        ResponseEntity<Transaction> transaction = createNewTransaction(book,member);
++
++        Assert.assertEquals("title 1", transaction.getBody().getBook().getTitle());
++        Assert.assertEquals(200,transaction.getStatusCode().value());
++
++        //clear a transaction
++        transactionRepository.deleteById(transaction.getBody().getId());
++        bookRepository.deleteById(book.getBody().getId());
++        memberRepository.deleteById(member.getBody().getId());
++    }
++
++    private ResponseEntity<Transaction> createNewTransaction(ResponseEntity<Book> book, ResponseEntity<Member> member) {
++
++        HttpEntity<Object> body = getHttpEntity("{ \"bookId\":"+book.getBody().getId()+",\"memberId\":"+member.getBody().getId()+" }");
++
++        return template.postForEntity(
++                "/api/transaction", body, Transaction.class);
++    }
++
++    @Test
++    public void testReturnBookTransaction() {
++        ResponseEntity<Book> book = createBook(template);
++        ResponseEntity<Member> member = doMemberRegistration(template);
++        ResponseEntity<Transaction> transaction = createNewTransaction(book, member);
++        Long transactionId = transaction.getBody().getId();
++        Map<String, String> paramMap = new HashMap<>();
++        paramMap.put("transaction-id", String.valueOf(transactionId));
++        transaction = patchRestTemplate.exchange(
++                "/api/transaction/{transaction-id}/return", HttpMethod.PATCH,null,Transaction.class, paramMap);
++        Assert.assertNotNull(transaction);
++        Assert.assertEquals(transactionId,transaction.getBody().getId());
++        Assert.assertNotNull(transaction.getBody().getDateOfReturn());
++
++        //clear a transaction
++        transactionRepository.deleteById(transaction.getBody().getId());
++        bookRepository.deleteById(book.getBody().getId());
++        memberRepository.deleteById(member.getBody().getId());
++
++    }
++}
+\ No newline at end of file
+diff --git a/src/test/java/com/crossover/techtrial/service/BaseServiceTest.java b/src/test/java/com/crossover/techtrial/service/BaseServiceTest.java
+new file mode 100644
+index 0000000..a6ecda9
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/service/BaseServiceTest.java
+@@ -0,0 +1,55 @@
++package com.crossover.techtrial.service;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
++
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.model.Member;
++import com.crossover.techtrial.model.MembershipStatus;
++import com.crossover.techtrial.model.Transaction;
++
++public class BaseServiceTest {
++    List<Transaction> getTransactionList() {
++        List<Transaction>  transactions = new ArrayList<>();
++        Transaction transaction = getTransaction();
++        transactions.add(transaction);
++        return  transactions;
++    }
++
++    Transaction getTransaction() {
++        Transaction transaction = new Transaction();
++        transaction.setId(1l);
++        transaction.setBook(createMockBook(3l, "Title 3"));
++        transaction.setMember(createMockMember());
++        transaction.setDateOfIssue(LocalDateTime.now());
++        transaction.setDateOfReturn(LocalDateTime.MAX);
++        return transaction;
++    }
++
++    Member createMockMember() {
++        Member member = new Member();
++        member.setId(1l);
++        member.setEmail("test@test.com");
++        member.setMembershipStartDate(LocalDateTime.now());
++        member.setName("test");
++        member.setMembershipStatus(MembershipStatus.ACTIVE);
++        return member;
++    }
++
++    List<Book> getBookList() {
++        List<Book>  books = new ArrayList<>();
++        books.add(createMockBook(3l, "Title 3"));
++        books.add(createMockBook(2l, "Title 2"));
++        books.add(createMockBook(1l, "Title 1"));
++        return books;
++    }
++
++    Book createMockBook(long id, String title) {
++        Book book = new Book();
++        book.setId(id);
++        book.setTitle(title);
++        return  book;
++    }
++
++}
+diff --git a/src/test/java/com/crossover/techtrial/service/BookServiceImplTest.java b/src/test/java/com/crossover/techtrial/service/BookServiceImplTest.java
+new file mode 100644
+index 0000000..981867d
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/service/BookServiceImplTest.java
+@@ -0,0 +1,76 @@
++package com.crossover.techtrial.service;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertNull;
++import static org.mockito.Mockito.*;
++import static org.mockito.MockitoAnnotations.initMocks;
++
++import org.junit.Before;
++import org.junit.Test;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++
++import java.util.Arrays;
++import java.util.List;
++import java.util.Optional;
++
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.repositories.BookRepository;
++
++public class BookServiceImplTest extends BaseServiceTest{
++
++    @Mock
++    private BookRepository mockBookRepository;
++
++    @InjectMocks
++    private BookServiceImpl bookServiceImplUnderTest;
++
++    @Before
++    public void setUp() {
++        initMocks(this);
++    }
++
++    @Test
++    public void testGetAll() {
++        final List<Book> expectedResult = getBookList();
++
++        when(mockBookRepository.findAll()).thenReturn(getBookList());
++        final List<Book> result = bookServiceImplUnderTest.getAll();
++
++        assertEquals(expectedResult.size(), result.size());
++    }
++
++    @Test
++    public void testSave() {
++        final Book book = createMockBook(1l, "Title 1");
++        final Book expectedResult = book;
++        when(mockBookRepository.save(book)).thenReturn(book);
++        final Book result = bookServiceImplUnderTest.save(book);
++
++        assertEquals(expectedResult.getId(), result.getId());
++    }
++
++    @Test
++    public void testFindById() {
++        final Long bookId = 1L;
++        final Book expectedResult = createMockBook(1l, "Title 1");
++
++        when(mockBookRepository.findById(bookId)).thenReturn(Optional.of(expectedResult));
++        final Book result = bookServiceImplUnderTest.findById(bookId);
++
++        assertEquals(expectedResult.getId(), result.getId());
++
++        when(mockBookRepository.findById(bookId)).thenReturn(Optional.ofNullable(null));
++        final Book result1 = bookServiceImplUnderTest.findById(bookId);
++
++        assertNull(result1);
++    }
++
++    @Test
++    public void testDeleteById() {
++        final Long id = 1L;
++        doNothing().when(mockBookRepository).deleteById(id);
++        bookServiceImplUnderTest.deleteById(id);
++        verify(mockBookRepository).deleteById(id);
++    }
++}
+diff --git a/src/test/java/com/crossover/techtrial/service/MemberServiceImplTest.java b/src/test/java/com/crossover/techtrial/service/MemberServiceImplTest.java
+new file mode 100644
+index 0000000..d1cf69f
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/service/MemberServiceImplTest.java
+@@ -0,0 +1,89 @@
++package com.crossover.techtrial.service;
++
++import static org.junit.Assert.assertEquals;
++import static org.mockito.Mockito.when;
++import static org.mockito.MockitoAnnotations.initMocks;
++
++import org.junit.Before;
++import org.junit.Test;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Optional;
++
++import com.crossover.techtrial.dto.TopMemberDTO;
++import com.crossover.techtrial.model.Member;
++import com.crossover.techtrial.repositories.MemberRepository;
++import com.crossover.techtrial.repositories.TransactionRepository;
++
++public class MemberServiceImplTest extends BaseServiceTest{
++
++    @Mock
++    private MemberRepository mockMemberRepository;
++    @Mock
++    private TransactionRepository mockTransactionRepository;
++
++    @InjectMocks
++    private MemberServiceImpl memberServiceImplUnderTest;
++
++    @Before
++    public void setUp() {
++        initMocks(this);
++    }
++
++    @Test
++    public void testSave() {
++        final Member member = createMockMember();
++        final Member expectedResult = createMockMember();
++
++        when(mockMemberRepository.save(member)).thenReturn(member);
++        final Member result = memberServiceImplUnderTest.save(member);
++
++        assertEquals(expectedResult.getId(), result.getId());
++    }
++
++    @Test
++    public void testFindById() {
++        final Long memberId = 1L;
++        final Member expectedResult = createMockMember();
++
++        when(mockMemberRepository.findById(memberId)).thenReturn(Optional.of(expectedResult));
++        final Member result = memberServiceImplUnderTest.findById(memberId);
++
++        assertEquals(expectedResult.getId(), result.getId());
++        assertEquals(expectedResult, result);
++    }
++
++    @Test
++    public void testFindAll() {
++        final List<Member> expectedResult = getMembers();
++
++        when(mockMemberRepository.findAll()).thenReturn(expectedResult);
++        final List<Member> result = memberServiceImplUnderTest.findAll();
++
++        assertEquals(expectedResult, result);
++        assertEquals(expectedResult.size(), result.size());
++    }
++
++    private List<Member> getMembers() {
++        List<Member> members = new ArrayList<>();
++        members.add(createMockMember());
++        return members;
++    }
++
++    @Test
++    public void testFindByIssuedDate() {
++        final LocalDateTime startTime = LocalDateTime.of(2017, 1, 1, 0, 0, 0);
++        final LocalDateTime endTime = LocalDateTime.of(2017, 1, 1, 0, 0, 0);
++        final ArrayList<TopMemberDTO> expectedResult = new ArrayList<>();
++        expectedResult.add(new TopMemberDTO());
++        when(mockTransactionRepository.findAllByDateOfIssueAndDateOfReturn(startTime,endTime)).thenReturn(getMembers());
++        final ArrayList<TopMemberDTO> result = memberServiceImplUnderTest.findByIssuedDate(startTime, endTime);
++
++        assertEquals(expectedResult.size(), result.size());
++    }
++}
+diff --git a/src/test/java/com/crossover/techtrial/service/TransactionServiceImplTest.java b/src/test/java/com/crossover/techtrial/service/TransactionServiceImplTest.java
+new file mode 100644
+index 0000000..9c89dc2
+--- /dev/null
++++ b/src/test/java/com/crossover/techtrial/service/TransactionServiceImplTest.java
+@@ -0,0 +1,80 @@
++package com.crossover.techtrial.service;
++
++import static org.junit.Assert.*;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.when;
++import static org.mockito.MockitoAnnotations.initMocks;
++
++import org.junit.Before;
++import org.junit.Test;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Optional;
++
++import com.crossover.techtrial.dto.MemberBooks;
++import com.crossover.techtrial.model.Book;
++import com.crossover.techtrial.model.Member;
++import com.crossover.techtrial.model.MembershipStatus;
++import com.crossover.techtrial.model.Transaction;
++import com.crossover.techtrial.repositories.BookRepository;
++import com.crossover.techtrial.repositories.TransactionRepository;
++
++public class TransactionServiceImplTest extends BaseServiceTest{
++
++    @Mock
++    private TransactionRepository mockTransactionRepository;
++    @Mock
++    private BookRepository mockBookRepository;
++
++    @InjectMocks
++    private TransactionServiceImpl transactionServiceImplUnderTest;
++
++    @Before
++    public void setUp() {
++        initMocks(this);
++    }
++
++    @Test
++    public void testSaveMemberBooks() {
++        final MemberBooks memberBooks = new MemberBooks();
++        memberBooks.setMember(new Member());
++        memberBooks.setBooks(Arrays.asList(1l,2l,3l));
++        when(mockBookRepository.findAllById(any())).thenReturn(getBookList());
++        when(mockTransactionRepository.saveAll(any())).thenReturn(getTransactionList());
++        List<Transaction> transactionList = transactionServiceImplUnderTest.saveMemberBooks(memberBooks);
++        assertNotNull(transactionList);
++        assertEquals(1, transactionList.size());
++    }
++
++
++    @Test
++    public void testSave() {
++        final Transaction transaction = getTransaction();
++        final Transaction expectedResult = getTransaction();
++        when(mockTransactionRepository.save(transaction)).thenReturn(transaction);
++        final Transaction result = transactionServiceImplUnderTest.save(transaction);
++
++        assertEquals(expectedResult.getId(), result.getId());
++    }
++
++    @Test
++    public void testFindById() {
++        final Long transactionId = 1L;
++        Transaction expectedResult = getTransaction();
++        when(mockTransactionRepository.findById(transactionId)).thenReturn(Optional.of(getTransaction()));
++        Transaction result = transactionServiceImplUnderTest.findById(transactionId);
++
++        assertEquals(expectedResult.getId(), result.getId());
++        assertEquals(expectedResult.getBook(), result.getBook());
++
++        when(mockTransactionRepository.findById(transactionId)).thenReturn(Optional.ofNullable(null));
++        result = transactionServiceImplUnderTest.findById(transactionId);
++
++        assertNull(result);
++    }
++}
+-- 
+2.11.0.windows.1
+
